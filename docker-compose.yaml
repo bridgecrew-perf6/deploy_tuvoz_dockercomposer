@@ -1,9 +1,78 @@
-version: '2'
+version: '3'
+volumes:
+  mariadb:
+    driver: local
+  data:
+
+networks:
+  db:
+    driver: bridge
+
 services:
+
+
+# Base de Datos
+  mariadb:
+    image: mariadb:10.6
+    container_name: mariadb
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: 123
+      MYSQL_USER:  tuvoz
+      MYSQL_PASSWORD: TuVozUniz
+    expose:
+        - "40000"
+    ports:
+        - "40000:3306"
+    volumes:
+     - mariadb:/var/lib/mysql
+     - ./mariadb/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
+    networks:
+      db:
+
+# Gestor de BD      
+  phpmyadmin:
+    image: phpmyadmin
+    container_name: phpmyadmin
+    restart: always
+    expose:
+      - "8081"
+    ports:
+      - "8081:80"
+    environment:
+      - PMA_HOST=mariadb
+      - PMA_PORT=3306
+      - UPLOAD_LIMIT=2048M
+      - MEMORY_LIMIT=512M 
+    depends_on:
+      - mariadb
+    networks:
+      db:
+
+# Aplicacion Backend TuVoz
   api_tuvoz:
     image: fjvigil/api_tuvoz
     user: root
+    container_name: api_tuvoz
+    restart: unless-stopped
+    tty: true
+    working_dir: /var/www/html
+    volumes:
+      - data:/var/www/html
+    environment:
+      - DB_CONNECTION=mysql      
+      - DB_HOST=mariadb
+      - DB_PORT=3306
+      - DB_DATABASE=tuvoz
+      - DB_USERNAME=root
+      - DB_PASSWORD=123
+    links:
+      - mariadb
+    depends_on:
+      - mariadb
     command: 'php artisan serve --host=0.0.0.0 --port=8080'
-    restart: always             # run as a service
     ports:
       - 8080:8080
+    networks:
+      db:
+      
